@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 -std=c99 -Iinclude -D_DEFAULT_SOURCE -D_GNU_SOURCE
+CFLAGS = -Wall -Wextra -O2 -std=gnu99 -Iinclude -D_DEFAULT_SOURCE -D_GNU_SOURCE -D_DARWIN_C_SOURCE
 LDFLAGS = 
 
 TARGET = chupet
