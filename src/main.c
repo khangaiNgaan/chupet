@@ -193,9 +193,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("Chupet Translator (c) 2026 caffeine-Ink\n");
-    printf("Target: %s | Provider: %s | Model: %s\n", config.targetLanguage, config.provider, config.modelName);
-    printf("Enter text to translate (use \"\"\" for multiline). Press Ctrl+C or Ctrl+D to exit.\n");
+    printf("\nChupet Translator v0.1.0 (c) 2026 caffeine-Ink\n");
+    printf("Target  : %s\n", config.targetLanguage);
+    printf("Provider: %s\n", config.provider);
+    printf("Model   : %s\n", config.modelName);
+    printf("Enter text to translate (use \"\"\" for multiline). Press Ctrl+D to exit.\n\n");
 
     char *line;
     char inputBuffer[16384] = {0};
