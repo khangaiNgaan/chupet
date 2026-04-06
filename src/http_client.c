@@ -24,11 +24,7 @@ void http_response_free(HttpResponse *response) {
 }
 
 int http_post(const char *url, struct curl_slist *headers, const char *post_data, HttpResponse *response) {
-    // We will build a curl command line string
-    // Example: curl -s -X POST -H "Content-Type: application/json" -d 'data' 'url'
-    
-    // For simplicity and maximum compatibility, we use a temporary file for post data 
-    // to avoid shell escaping issues with large JSON payloads.
+    // create temporary file for payload
     char tmp_file[256];
 #ifndef _WIN32
     snprintf(tmp_file, sizeof(tmp_file), "/tmp/chupet_post_XXXXXX");
@@ -47,8 +43,8 @@ int http_post(const char *url, struct curl_slist *headers, const char *post_data
     fputs(post_data, f);
     fclose(f);
 
+    // build curl command string
     char cmd[16384];
-    // Construct command: curl -s -X POST -H "..." --data-binary @tmp_file "url"
     snprintf(cmd, sizeof(cmd), "curl -s -X POST ");
     
     struct curl_slist *h = headers;
@@ -65,7 +61,7 @@ int http_post(const char *url, struct curl_slist *headers, const char *post_data
     strcat(cmd, url);
     strcat(cmd, "\"");
 
-    // Execute and read output
+    // execute command and read output
     FILE *fp = popen(cmd, "r");
     if (!fp) {
         remove(tmp_file);

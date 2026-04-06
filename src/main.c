@@ -149,11 +149,48 @@ void print_usage() {
     printf("  chupet config key <api_key>\n");
 }
 
+#ifdef _WIN32
+#include <conio.h>
+char* windows_gets(const char* prompt) {
+    printf("%s", prompt);
+    fflush(stdout);
+    static char buf[4096];
+    int i = 0;
+    while (i < 4095) {
+        int ch = _getch();
+        if (ch == 3 || ch == 4 || ch == 26) { // Ctrl+C, Ctrl+D, Ctrl+Z
+            printf("\n");
+            return NULL;
+        }
+        if (ch == '\r' || ch == '\n') {
+            printf("\n");
+            buf[i] = '\0';
+            return strdup(buf);
+        }
+        if (ch == '\b') { // handle backspace
+            if (i > 0) {
+                i--;
+                printf("\b \b");
+            }
+            continue;
+        }
+        if (ch >= 32 || ch < 0) { // Allow all printable and non-ASCII (UTF-8 bytes)
+            buf[i++] = (char)ch;
+            putchar(ch);
+        } else if (ch == 0 || ch == 224) { // Special keys (arrows, etc)
+            _getch(); // Skip the next byte
+        }
+    }
+    buf[i] = '\0';
+    return strdup(buf);
+}
+#endif
+
 int main(int argc, char *argv[]) {
     setlocale(LC_ALL, "");
 
 #ifdef _WIN32
-    // force utf-8 for input/output and enable ANSI escape codes
+    // init windows console utf-8 and ansi
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
     
@@ -216,7 +253,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("\nChupet Translator v0.1.3 (c) 2026 caffeine-Ink\n");
+    printf("\nChupet Translator v0.1.4 (c) 2026 caffeine-Ink\n");
     printf("Target  : %s\n", config.targetLanguage);
     printf("Provider: %s\n", config.provider);
     printf("Model   : %s\n", config.modelName);
@@ -242,31 +279,17 @@ int main(int argc, char *argv[]) {
 #ifndef _WIN32
             line = linenoise(prompt_str);
 #else
-            printf("%s", prompt_str);
-            fflush(stdout);
-            char buf[4096];
-            if (fgets(buf, sizeof(buf), stdin) == NULL) break;
-            if (buf[0] == 4) { printf("\n"); break; } // Handle Ctrl+D (\x04)
-            size_t len = strlen(buf);
-            if (len > 0 && buf[len-1] == '\n') buf[len-1] = '\0';
-            line = strdup(buf);
+            line = windows_gets(prompt_str);
 #endif
         } else {
 #ifndef _WIN32
             line = linenoise("... ");
 #else
-            printf("... ");
-            fflush(stdout);
-            char buf[4096];
-            if (fgets(buf, sizeof(buf), stdin) == NULL) break;
-            if (buf[0] == 4) { printf("\n"); break; } // Handle Ctrl+D (\x04)
-            size_t len = strlen(buf);
-            if (len > 0 && buf[len-1] == '\n') buf[len-1] = '\0';
-            line = strdup(buf);
+            line = windows_gets("... ");
 #endif
         }
 
-        if (line == NULL) break; // Ctrl+C or Ctrl+D
+        if (line == NULL) break; // Ctrl+C or Ctrl+D or Ctrl+Z
 
         char *trimmed = line;
         while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
