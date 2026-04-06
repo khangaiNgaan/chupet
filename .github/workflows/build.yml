@@ -1,0 +1,59 @@
+# build and release chupet binaries
+name: Build Chupet
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: chupet-linux
+          - os: macos-latest
+            artifact_name: chupet-macos
+          - os: windows-latest
+            artifact_name: chupet-windows.exe
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # compile for linux and macos
+    - name: compile unix binaries
+      if: matrix.os != 'windows-latest'
+      run: make
+
+    # compile for windows using gcc
+    - name: compile windows binary
+      if: matrix.os == 'windows-latest'
+      run: |
+        gcc -Wall -Wextra -O2 -std=gnu99 -Iinclude -D_DEFAULT_SOURCE -D_GNU_SOURCE src/main.c src/config.c src/http_client.c src/linenoise.c -o chupet-windows.exe
+
+    # upload artifacts to github
+    - name: upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: ${{ matrix.os == 'windows-latest' && 'chupet-windows.exe' || 'chupet' }}
+
+  # attach binaries to github release
+  publish:
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            chupet-linux/chupet
+            chupet-macos/chupet
+            chupet-windows.exe/chupet-windows.exe
