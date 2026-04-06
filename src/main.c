@@ -216,11 +216,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("\nChupet Translator v0.1.2 (c) 2026 caffeine-Ink\n");
+    printf("\nChupet Translator v0.1.3 (c) 2026 caffeine-Ink\n");
     printf("Target  : %s\n", config.targetLanguage);
     printf("Provider: %s\n", config.provider);
     printf("Model   : %s\n", config.modelName);
+#ifndef _WIN32
     printf("Enter text to translate (use \"\"\" for multiline). Press Ctrl+D to exit.\n\n");
+#else
+    printf("Enter text to translate (use \"\"\" for multiline). Press Ctrl+Z or Ctrl+D to exit.\n\n");
+#endif
 
     char *line = NULL;
     char inputBuffer[16384] = {0};
@@ -242,6 +246,7 @@ int main(int argc, char *argv[]) {
             fflush(stdout);
             char buf[4096];
             if (fgets(buf, sizeof(buf), stdin) == NULL) break;
+            if (buf[0] == 4) { printf("\n"); break; } // Handle Ctrl+D (\x04)
             size_t len = strlen(buf);
             if (len > 0 && buf[len-1] == '\n') buf[len-1] = '\0';
             line = strdup(buf);
@@ -254,6 +259,7 @@ int main(int argc, char *argv[]) {
             fflush(stdout);
             char buf[4096];
             if (fgets(buf, sizeof(buf), stdin) == NULL) break;
+            if (buf[0] == 4) { printf("\n"); break; } // Handle Ctrl+D (\x04)
             size_t len = strlen(buf);
             if (len > 0 && buf[len-1] == '\n') buf[len-1] = '\0';
             line = strdup(buf);
