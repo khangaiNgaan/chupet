@@ -216,7 +216,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("\nChupet Translator v0.1.1 (c) 2026 caffeine-Ink\n");
+    printf("\nChupet Translator v0.1.2 (c) 2026 caffeine-Ink\n");
     printf("Target  : %s\n", config.targetLanguage);
     printf("Provider: %s\n", config.provider);
     printf("Model   : %s\n", config.modelName);
