@@ -2,3 +2,4 @@
 *.o
 chupet
 c.txt
+dist/
