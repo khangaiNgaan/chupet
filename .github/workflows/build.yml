@@ -1,5 +1,5 @@
-# build and release chupet binaries
-name: Build Chupet
+# release chupet windows x64 binary
+name: Release
 
 on:
   release:
@@ -7,53 +7,36 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: build for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            artifact_name: chupet-linux
-          - os: macos-latest
-            artifact_name: chupet-macos
-          - os: windows-latest
-            artifact_name: chupet-windows.exe
-
+  build-windows:
+    name: build for windows-x64
+    runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
 
-    # compile for linux and macos
-    - name: compile unix binaries
-      if: matrix.os != 'windows-latest'
-      run: make
-
-    # compile for windows using gcc
-    - name: compile windows binary
-      if: matrix.os == 'windows-latest'
+    # compile windows x64 binary using gcc
+    - name: compile chupet-windows-x64.exe
       run: |
-        gcc -Wall -Wextra -O2 -std=gnu99 -Iinclude -D_DEFAULT_SOURCE -D_GNU_SOURCE src/main.c src/config.c src/http_client.c -o chupet-windows.exe
+        gcc -Wall -Wextra -O2 -std=gnu99 -Iinclude -D_DEFAULT_SOURCE -D_GNU_SOURCE src/main.c src/config.c src/http_client.c -o chupet-windows-x64.exe
 
-    # upload artifacts to github
-    - name: upload build artifacts
+    # upload executable to github actions artifacts
+    - name: upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.artifact_name }}
-        path: ${{ matrix.os == 'windows-latest' && 'chupet-windows.exe' || 'chupet' }}
+        name: chupet-windows-x64-exe
+        path: chupet-windows-x64.exe
 
-  # attach binaries to github release
+  # attach exe to github release
   publish:
-    needs: build
+    needs: build-windows
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
-      - name: upload release assets
+        with:
+          name: chupet-windows-x64-exe
+      - name: upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            chupet-linux/chupet
-            chupet-macos/chupet
-            chupet-windows.exe/chupet-windows.exe
+          files: chupet-windows-x64.exe
