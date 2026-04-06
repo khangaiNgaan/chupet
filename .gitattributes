@@ -1,1 +1,2 @@
-include/** linguist-vendored
+include/jsmn.h linguist-vendored
+include/linenoise.h linguist-vendored
