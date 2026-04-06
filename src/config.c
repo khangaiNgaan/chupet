@@ -3,7 +3,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include "config.h"
-#define JSMN_HEADER
 #include "jsmn.h"
 
 // helper for jsmn

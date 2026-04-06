@@ -5,6 +5,13 @@
 #include <unistd.h>
 #include <locale.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
+#endif
+
 #include "config.h"
 #include "http_client.h"
 #include "jsmn.h"
@@ -144,6 +151,20 @@ void print_usage() {
 
 int main(int argc, char *argv[]) {
     setlocale(LC_ALL, "");
+
+#ifdef _WIN32
+    // force utf-8 for input/output and enable ANSI escape codes
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+    
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD dwMode = 0;
+    if (hOut != INVALID_HANDLE_VALUE && GetConsoleMode(hOut, &dwMode)) {
+        dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        SetConsoleMode(hOut, dwMode);
+    }
+#endif
+
     load_config(&config);
 
     if (argc > 1) {
