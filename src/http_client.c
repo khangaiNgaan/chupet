@@ -4,6 +4,12 @@
 #include <unistd.h>
 #include "http_client.h"
 
+// Platform-aware popen/pclose
+#ifdef _WIN32
+#define popen _popen
+#define pclose _pclose
+#endif
+
 void http_response_init(HttpResponse *response) {
     response->data = NULL;
     response->size = 0;
@@ -23,14 +29,18 @@ int http_post(const char *url, struct curl_slist *headers, const char *post_data
     
     // For simplicity and maximum compatibility, we use a temporary file for post data 
     // to avoid shell escaping issues with large JSON payloads.
-    char tmp_file[] = "/tmp/chupet_post_XXXXXX";
+    char tmp_file[256];
+#ifndef _WIN32
+    snprintf(tmp_file, sizeof(tmp_file), "/tmp/chupet_post_XXXXXX");
     int fd = mkstemp(tmp_file);
-    if (fd == -1) {
-        // Fallback for systems without /tmp or mkstemp (like Windows)
-        strcpy(tmp_file, "chupet_payload.tmp");
-    } else {
+    if (fd != -1) {
         close(fd);
+    } else {
+        snprintf(tmp_file, sizeof(tmp_file), "chupet_payload.tmp");
     }
+#else
+    snprintf(tmp_file, sizeof(tmp_file), "chupet_payload.tmp");
+#endif
 
     FILE *f = fopen(tmp_file, "w");
     if (!f) return -1;

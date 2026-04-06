@@ -8,7 +8,9 @@
 #include "config.h"
 #include "http_client.h"
 #include "jsmn.h"
+#ifndef _WIN32
 #include "linenoise.h"
+#endif
 
 AppConfig config;
 
@@ -199,20 +201,42 @@ int main(int argc, char *argv[]) {
     printf("Model   : %s\n", config.modelName);
     printf("Enter text to translate (use \"\"\" for multiline). Press Ctrl+D to exit.\n\n");
 
-    char *line;
+    char *line = NULL;
     char inputBuffer[16384] = {0};
     bool isMultiline = false;
     char prompt_str[256];
     
+#ifndef _WIN32
     linenoiseHistorySetMaxLen(100);
     linenoiseSetMultiLine(1);
+#endif
 
     while (1) {
         if (!isMultiline) {
             snprintf(prompt_str, sizeof(prompt_str), "chupet (%s) > ", config.targetLanguage);
+#ifndef _WIN32
             line = linenoise(prompt_str);
+#else
+            printf("%s", prompt_str);
+            fflush(stdout);
+            char buf[4096];
+            if (fgets(buf, sizeof(buf), stdin) == NULL) break;
+            size_t len = strlen(buf);
+            if (len > 0 && buf[len-1] == '\n') buf[len-1] = '\0';
+            line = strdup(buf);
+#endif
         } else {
+#ifndef _WIN32
             line = linenoise("... ");
+#else
+            printf("... ");
+            fflush(stdout);
+            char buf[4096];
+            if (fgets(buf, sizeof(buf), stdin) == NULL) break;
+            size_t len = strlen(buf);
+            if (len > 0 && buf[len-1] == '\n') buf[len-1] = '\0';
+            line = strdup(buf);
+#endif
         }
 
         if (line == NULL) break; // Ctrl+C or Ctrl+D
@@ -255,11 +279,17 @@ int main(int argc, char *argv[]) {
                 }
             }
         } else if (strlen(trimmed) > 0) {
+#ifndef _WIN32
             linenoiseHistoryAdd(line);
+#endif
             process_translation(trimmed);
         }
 
+#ifndef _WIN32
         linenoiseFree(line);
+#else
+        free(line);
+#endif
     }
 
     printf("\nGoodbye!\n");

@@ -32,7 +32,7 @@ jobs:
     - name: compile windows binary
       if: matrix.os == 'windows-latest'
       run: |
-        gcc -Wall -Wextra -O2 -std=gnu99 -Iinclude -D_DEFAULT_SOURCE -D_GNU_SOURCE src/main.c src/config.c src/http_client.c src/linenoise.c -o chupet-windows.exe
+        gcc -Wall -Wextra -O2 -std=gnu99 -Iinclude -D_DEFAULT_SOURCE -D_GNU_SOURCE src/main.c src/config.c src/http_client.c -o chupet-windows.exe
 
     # upload artifacts to github
     - name: upload build artifacts
