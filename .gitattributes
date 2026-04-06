@@ -1,2 +1,3 @@
 include/jsmn.h linguist-vendored
 include/linenoise.h linguist-vendored
+src/linenoise.c linguist-vendored
