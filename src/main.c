@@ -193,7 +193,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("\nChupet Translator v0.1.0 (c) 2026 caffeine-Ink\n");
+    printf("\nChupet Translator v0.1.1 (c) 2026 caffeine-Ink\n");
     printf("Target  : %s\n", config.targetLanguage);
     printf("Provider: %s\n", config.provider);
     printf("Model   : %s\n", config.modelName);
@@ -205,6 +205,7 @@ int main(int argc, char *argv[]) {
     char prompt_str[256];
     
     linenoiseHistorySetMaxLen(100);
+    linenoiseSetMultiLine(1);
 
     while (1) {
         if (!isMultiline) {
