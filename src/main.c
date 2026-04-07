@@ -45,7 +45,7 @@ void process_translation(const char *text, const char *origin, const char *targe
     
     char prompt[16384];
     snprintf(prompt, sizeof(prompt), 
-             "You are a professional translator. Translate the following text from %s to %s. Only output the translation result, no explanation.\n\nText: %s", 
+             "You are a professional translator. Translate the following text from %s to %s. Only output the translation result, no explanation. No surplus line break in the end of output. Don't translate the `Text:`.\n\nText: %s", 
              origin, target, text);
              
     char *escaped_prompt = escape_json(prompt);
@@ -111,14 +111,18 @@ void process_translation(const char *text, const char *origin, const char *targe
 }
 
 void print_help() {
-    printf("usage: chupet [OPTIONS] [TEXT]\n\n");
+    printf("USAGE: chupet [options] [text]\n\n");
     printf("chupet v0.2.0 (c) 2026 caffeine-Ink\n\n");
-    printf("commands:\n");
-    printf("  config <key> <value>   update configuration\n");
-    printf("options:\n");
-    printf("  -o, --origin <lang>    origin language (default: %s)\n", config.originLanguage);
-    printf("  -t, --target <lang>    target language (default: %s)\n", config.targetLanguage);
+    printf("OPTIONS:\n");
+    printf("  -o, --origin <lang>    original language (config: %s)\n", config.originLanguage);
+    printf("  -t, --target <lang>    target language   (config: %s)\n", config.targetLanguage);
     printf("  -h, --help             show this help\n");
+    printf("COMMANDS:\n");
+    printf("  config <key> <value>   update configuration\n");
+    printf("EXAMPLES:\n");
+    printf("  chupet -o English -t Japanese \"The quick brown fox jumps over the lazy dog.\"\n");
+    printf("  chupet < file.txt\n");
+    printf("  cat file.txt | chupet -t Chinese > output.txt\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -133,26 +137,37 @@ int main(int argc, char *argv[]) {
     // handle config command
     if (argc >= 2 && strcmp(argv[1], "config") == 0) {
         if (argc == 2) {
-            printf("Current configuration:\n");
-            printf("  provider: %s\n", strlen(config.provider) > 0 ? config.provider : "(not set)");
-            printf("  model   : %s\n", strlen(config.modelName) > 0 ? config.modelName : "(not set)");
-            printf("  key     : %s\n", strlen(config.geminiApiKey) > 0 ? "********" : "(not set)");
+            printf("CURRENT CONFIG:\n");
+            printf("  provider: %s\n", strlen(config.provider) > 0 ? config.provider : "<not set>");
+            printf("  model   : %s\n", strlen(config.modelName) > 0 ? config.modelName : "<not set>");
+            printf("  key     : %s\n", strlen(config.geminiApiKey) > 0 ? "<configured>" : "<not set>");
             printf("  origin  : %s\n", config.originLanguage);
             printf("  target  : %s\n", config.targetLanguage);
             return 0;
         }
         if (argc >= 4) {
-            if (strcmp(argv[2], "provider") == 0) snprintf(config.provider, sizeof(config.provider), "%s", argv[3]);
-            else if (strcmp(argv[2], "model") == 0) snprintf(config.modelName, sizeof(config.modelName), "%s", argv[3]);
-            else if (strcmp(argv[2], "key") == 0) snprintf(config.geminiApiKey, sizeof(config.geminiApiKey), "%s", argv[3]);
-            else if (strcmp(argv[2], "origin") == 0) snprintf(config.originLanguage, sizeof(config.originLanguage), "%s", argv[3]);
-            else if (strcmp(argv[2], "target") == 0) snprintf(config.targetLanguage, sizeof(config.targetLanguage), "%s", argv[3]);
-            else { printf("Unknown config key: %s\n", argv[2]); return 1; }
+            if (strcmp(argv[2], "provider") == 0) {
+                snprintf(config.provider, sizeof(config.provider), "%s", argv[3]);
+                printf("Provider is set to: %s\n", argv[3]);
+            } else if (strcmp(argv[2], "model") == 0) {
+                snprintf(config.modelName, sizeof(config.modelName), "%s", argv[3]);
+                printf("Model is set to: %s\n", argv[3]);
+            } else if (strcmp(argv[2], "key") == 0) {
+                snprintf(config.geminiApiKey, sizeof(config.geminiApiKey), "%s", argv[3]);
+                printf("Gemini API key updated.\n");
+            } else if (strcmp(argv[2], "origin") == 0) {
+                snprintf(config.originLanguage, sizeof(config.originLanguage), "%s", argv[3]);
+                printf("Default original language is set to: %s\n", argv[3]);
+            } else if (strcmp(argv[2], "target") == 0) {
+                snprintf(config.targetLanguage, sizeof(config.targetLanguage), "%s", argv[3]);
+                printf("Default target language is set to: %s\n", argv[3]);
+            } else { 
+                printf("unknown config key: %s\n", argv[2]); return 1; 
+            }
             save_config(&config);
-            printf("Config updated: %s = %s\n", argv[2], argv[3]);
             return 0;
         }
-        printf("Usage: chupet config [key value]\n");
+        printf("usage: chupet config <key> <value>\n");
         return 1;
     }
 
@@ -180,7 +195,7 @@ int main(int argc, char *argv[]) {
     // check config
     if (strlen(config.provider) == 0 || strlen(config.modelName) == 0 ||
         (strcmp(config.provider, "gemini") == 0 && strlen(config.geminiApiKey) == 0)) {
-        printf("Error: Configuration required. Run 'chupet -h' for help.\n");
+        printf("configuration required. run 'chupet -h' for help.\n");
         return 1;
     }
 
