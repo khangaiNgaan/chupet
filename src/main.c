@@ -113,7 +113,7 @@ void process_translation(const char *text, const char *origin, const char *targe
 
 void print_help() {
     printf("USAGE: chupet [options] [text]\n\n");
-    printf("chupet v0.2.0 (c) 2026 caffeine-Ink\n\n");
+    printf("chupet v0.2.1 (c) 2026 caffeine-Ink\n\n");
     printf("OPTIONS:\n");
     printf("  -o, --origin <lang>    original language (config: %s)\n", config.originLanguage);
     printf("  -t, --target <lang>    target language   (config: %s)\n", config.targetLanguage);

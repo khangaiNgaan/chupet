@@ -20,7 +20,11 @@ static void get_config_path(char *path, size_t size) {
     const char *home = getenv("HOME");
     if (!home) home = getenv("USERPROFILE");
     if (!home) home = ".";
+#ifdef _WIN32
+    snprintf(path, size, "%s\\.chupet-config.json", home);
+#else
     snprintf(path, size, "%s/.chupet-config.json", home);
+#endif
 }
 
 void load_config(AppConfig *config) {
@@ -34,7 +38,8 @@ void load_config(AppConfig *config) {
     char path[512];
     get_config_path(path, sizeof(path));
 
-    FILE *f = fopen(path, "r");
+    // use binary mode to avoid CRLF issues on Windows
+    FILE *f = fopen(path, "rb");
     if (!f) return;
 
     fseek(f, 0, SEEK_END);
@@ -51,14 +56,15 @@ void load_config(AppConfig *config) {
         fclose(f);
         return;
     }
-    fread(json, 1, fsize, f);
+    size_t read_bytes = fread(json, 1, fsize, f);
     fclose(f);
-    json[fsize] = '\0';
+    json[read_bytes] = '\0';
 
     jsmn_parser p;
     jsmntok_t t[128];
     jsmn_init(&p);
-    int r = jsmn_parse(&p, json, strlen(json), t, sizeof(t) / sizeof(t[0]));
+    // parse using the actual read size
+    int r = jsmn_parse(&p, json, read_bytes, t, sizeof(t) / sizeof(t[0]));
     
     if (r < 0 || t[0].type != JSMN_OBJECT) {
         free(json);
@@ -89,7 +95,8 @@ void load_config(AppConfig *config) {
 void save_config(const AppConfig *config) {
     char path[512];
     get_config_path(path, sizeof(path));
-    FILE *f = fopen(path, "w");
+    // write in binary mode for consistency
+    FILE *f = fopen(path, "wb");
     if (!f) return;
 
     fprintf(f, "{\n");
