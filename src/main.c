@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <getopt.h>
 #include <locale.h>
 
 #ifdef _WIN32
@@ -177,14 +178,20 @@ int main(int argc, char *argv[]) {
 
     // parse options
     int opt;
-    extern char *optarg;
-    extern int optind;
-    while ((opt = getopt(argc, argv, "o:t:h")) != -1) {
+    static struct option long_options[] = {
+        {"origin", required_argument, 0, 'o'},
+        {"target", required_argument, 0, 't'},
+        {"help",   no_argument,       0, 'h'},
+        {0, 0, 0, 0}
+    };
+
+    int option_index = 0;
+    while ((opt = getopt_long(argc, argv, "o:t:h", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'o': origin_override = optarg; break;
             case 't': target_override = optarg; break;
             case 'h': print_help(); return 0;
-            default: print_help(); return 1;
+            default: return 1;
         }
     }
 
