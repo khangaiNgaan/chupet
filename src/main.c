@@ -15,9 +15,6 @@
 #include "config.h"
 #include "http_client.h"
 #include "jsmn.h"
-#ifndef _WIN32
-#include "linenoise.h"
-#endif
 
 AppConfig config;
 
@@ -43,19 +40,15 @@ char *escape_json(const char *input) {
     return escaped;
 }
 
-void process_translation(const char *text) {
+void process_translation(const char *text, const char *origin, const char *target) {
     if (!text || strlen(text) == 0) return;
     
-    printf("\nTranslating... ");
-    fflush(stdout);
-
-    char prompt[8192];
+    char prompt[16384];
     snprintf(prompt, sizeof(prompt), 
-             "You are a professional translator. Translate the following text to %s. Only output the translation result, no explanation.\n\nText: %s", 
-             config.targetLanguage, text);
+             "You are a professional translator. Translate the following text from %s to %s. Only output the translation result, no explanation.\n\nText: %s", 
+             origin, target, text);
              
     char *escaped_prompt = escape_json(prompt);
-    
     char *post_data = NULL;
     char url[1024];
     struct curl_slist *headers = NULL;
@@ -63,74 +56,51 @@ void process_translation(const char *text) {
     
     if (strcmp(config.provider, "gemini") == 0) {
         snprintf(url, sizeof(url), "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", config.modelName, config.geminiApiKey);
-        
         size_t post_len = strlen(escaped_prompt) + 256;
         post_data = malloc(post_len);
-        if (post_data) {
-            snprintf(post_data, post_len, "{\"contents\": [{\"parts\": [{\"text\": \"%s\"}]}]}", escaped_prompt);
-        }
+        if (post_data) snprintf(post_data, post_len, "{\"contents\": [{\"parts\": [{\"text\": \"%s\"}]}]}", escaped_prompt);
     } else { // ollama
         snprintf(url, sizeof(url), "http://localhost:11434/api/generate");
         size_t post_len = strlen(escaped_prompt) + strlen(config.modelName) + 256;
         post_data = malloc(post_len);
-        if (post_data) {
-            snprintf(post_data, post_len, "{\"model\": \"%s\", \"prompt\": \"%s\", \"stream\": false}", config.modelName, escaped_prompt);
-        }
+        if (post_data) snprintf(post_data, post_len, "{\"model\": \"%s\", \"prompt\": \"%s\", \"stream\": false}", config.modelName, escaped_prompt);
     }
     
     HttpResponse response;
     http_response_init(&response);
     
     if (post_data) {
-        int res = http_post(url, headers, post_data, &response);
-        printf("\r\033[K"); // clear the "Translating... " line
-        
-        if (res == 0 && response.data) {
+        if (http_post(url, headers, post_data, &response) == 0 && response.data) {
             jsmn_parser p;
             jsmntok_t t[4096]; 
             jsmn_init(&p);
             int r = jsmn_parse(&p, response.data, strlen(response.data), t, sizeof(t) / sizeof(t[0]));
-            
-            if (r < 0) {
-                printf("Error: Failed to parse JSON response.\n%s\n", response.data);
-            } else {
-                bool found = false;
+            if (r > 0) {
                 for (int i = 1; i < r; i++) {
                     if (t[i].type == JSMN_STRING) {
                         int len = t[i].end - t[i].start;
                         const char *str = response.data + t[i].start;
-                        if ((strncmp(str, "text", len) == 0 && len == 4) ||
-                            (strncmp(str, "response", len) == 0 && len == 8)) {
-                            
+                        if ((strncmp(str, "text", len) == 0 && len == 4) || (strncmp(str, "response", len) == 0 && len == 8)) {
                             if (i + 1 < r && t[i+1].type == JSMN_STRING) {
                                 int val_len = t[i+1].end - t[i+1].start;
                                 const char *val_str = response.data + t[i+1].start;
-                                
-                                for (int j = 0; j < val_len; j++) {
-                                    if (val_str[j] == '\\' && j + 1 < val_len) {
-                                        j++;
-                                        if (val_str[j] == 'n') putchar('\n');
-                                        else if (val_str[j] == 't') putchar('\t');
-                                        else if (val_str[j] == '"') putchar('"');
-                                        else if (val_str[j] == '\\') putchar('\\');
-                                        else putchar(val_str[j]);
-                                    } else {
-                                        putchar(val_str[j]);
-                                    }
+                                for (int k = 0; k < val_len; k++) {
+                                    if (val_str[k] == '\\' && k + 1 < val_len) {
+                                        k++;
+                                        if (val_str[k] == 'n') putchar('\n');
+                                        else if (val_str[k] == 't') putchar('\t');
+                                        else if (val_str[k] == '"') putchar('"');
+                                        else if (val_str[k] == '\\') putchar('\\');
+                                        else putchar(val_str[k]);
+                                    } else putchar(val_str[k]);
                                 }
-                                printf("\n\n");
-                                found = true;
+                                putchar('\n');
                                 break;
                             }
                         }
                     }
                 }
-                if (!found) {
-                    printf("Error: Unexpected response format.\n%s\n", response.data);
-                }
             }
-        } else {
-            printf("Error: HTTP request failed.\n");
         }
         free(post_data);
     }
@@ -140,208 +110,94 @@ void process_translation(const char *text) {
     curl_slist_free_all(headers);
 }
 
-void print_usage() {
-    printf("Usage:\n");
-    printf("  chupet set <language>\n");
-    printf("  chupet to <language>\n");
-    printf("  chupet config provider <ollama|gemini>\n");
-    printf("  chupet config model <model_name>\n");
-    printf("  chupet config key <api_key>\n");
+void print_help() {
+    printf("usage: chupet [OPTIONS] [TEXT]\n\n");
+    printf("chupet v0.2.0 (c) 2026 caffeine-Ink\n\n");
+    printf("commands:\n");
+    printf("  config <key> <value>   update configuration\n");
+    printf("options:\n");
+    printf("  -o, --origin <lang>    origin language (default: %s)\n", config.originLanguage);
+    printf("  -t, --target <lang>    target language (default: %s)\n", config.targetLanguage);
+    printf("  -h, --help             show this help\n");
 }
-
-#ifdef _WIN32
-#include <conio.h>
-char* windows_gets(const char* prompt) {
-    printf("%s", prompt);
-    fflush(stdout);
-    static char buf[4096];
-    int i = 0;
-    while (i < 4095) {
-        int ch = _getch();
-        if (ch == 3 || ch == 4 || ch == 26) { // Ctrl+C, Ctrl+D, Ctrl+Z
-            printf("\n");
-            return NULL;
-        }
-        if (ch == '\r' || ch == '\n') {
-            printf("\n");
-            buf[i] = '\0';
-            return strdup(buf);
-        }
-        if (ch == '\b') { // handle backspace
-            if (i > 0) {
-                i--;
-                printf("\b \b");
-            }
-            continue;
-        }
-        if (ch >= 32 || ch < 0) { // Allow all printable and non-ASCII (UTF-8 bytes)
-            buf[i++] = (char)ch;
-            putchar(ch);
-        } else if (ch == 0 || ch == 224) { // Special keys (arrows, etc)
-            _getch(); // Skip the next byte
-        }
-    }
-    buf[i] = '\0';
-    return strdup(buf);
-}
-#endif
 
 int main(int argc, char *argv[]) {
     setlocale(LC_ALL, "");
-
 #ifdef _WIN32
-    // init windows console utf-8 and ansi
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
-    
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    DWORD dwMode = 0;
-    if (hOut != INVALID_HANDLE_VALUE && GetConsoleMode(hOut, &dwMode)) {
-        dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-        SetConsoleMode(hOut, dwMode);
-    }
 #endif
 
     load_config(&config);
 
-    if (argc > 1) {
-        if (strcmp(argv[1], "set") == 0 && argc >= 3) {
-            char lang[128] = {0};
-            for (int i = 2; i < argc; i++) {
-                size_t current_len = strlen(lang);
-                snprintf(lang + current_len, sizeof(lang) - current_len, "%s%s", (i > 2 ? " " : ""), argv[i]);
-            }
-            snprintf(config.targetLanguage, sizeof(config.targetLanguage), "%s", lang);
-            save_config(&config);
-            printf("Target language set to: %s\n", lang);
+    // handle config command
+    if (argc >= 2 && strcmp(argv[1], "config") == 0) {
+        if (argc == 2) {
+            printf("Current configuration:\n");
+            printf("  provider: %s\n", strlen(config.provider) > 0 ? config.provider : "(not set)");
+            printf("  model   : %s\n", strlen(config.modelName) > 0 ? config.modelName : "(not set)");
+            printf("  key     : %s\n", strlen(config.geminiApiKey) > 0 ? "********" : "(not set)");
+            printf("  origin  : %s\n", config.originLanguage);
+            printf("  target  : %s\n", config.targetLanguage);
             return 0;
-        } else if (strcmp(argv[1], "to") == 0 && argc >= 3) {
-            char lang[128] = {0};
-            for (int i = 2; i < argc; i++) {
-                size_t current_len = strlen(lang);
-                snprintf(lang + current_len, sizeof(lang) - current_len, "%s%s", (i > 2 ? " " : ""), argv[i]);
-            }
-            snprintf(config.targetLanguage, sizeof(config.targetLanguage), "%s", lang);
-        } else if (strcmp(argv[1], "config") == 0 && argc == 4) {
-            if (strcmp(argv[2], "provider") == 0) {
-                snprintf(config.provider, sizeof(config.provider), "%s", argv[3]);
-                save_config(&config);
-                printf("Provider set to: %s\n", argv[3]);
-            } else if (strcmp(argv[2], "model") == 0) {
-                snprintf(config.modelName, sizeof(config.modelName), "%s", argv[3]);
-                save_config(&config);
-                printf("Model set to: %s\n", argv[3]);
-            } else if (strcmp(argv[2], "key") == 0) {
-                snprintf(config.geminiApiKey, sizeof(config.geminiApiKey), "%s", argv[3]);
-                save_config(&config);
-                printf("Gemini API key updated.\n");
-            } else {
-                print_usage();
-                return 1;
-            }
-            return 0;
-        } else {
-            print_usage();
-            return 1;
         }
-    }
-
-    if (strlen(config.provider) == 0 || strlen(config.modelName) == 0 ||
-        (strcmp(config.provider, "gemini") == 0 && strlen(config.geminiApiKey) == 0)) {
-        printf("Error: Configuration required.\n\n");
-        print_usage();
+        if (argc >= 4) {
+            if (strcmp(argv[2], "provider") == 0) snprintf(config.provider, sizeof(config.provider), "%s", argv[3]);
+            else if (strcmp(argv[2], "model") == 0) snprintf(config.modelName, sizeof(config.modelName), "%s", argv[3]);
+            else if (strcmp(argv[2], "key") == 0) snprintf(config.geminiApiKey, sizeof(config.geminiApiKey), "%s", argv[3]);
+            else if (strcmp(argv[2], "origin") == 0) snprintf(config.originLanguage, sizeof(config.originLanguage), "%s", argv[3]);
+            else if (strcmp(argv[2], "target") == 0) snprintf(config.targetLanguage, sizeof(config.targetLanguage), "%s", argv[3]);
+            else { printf("Unknown config key: %s\n", argv[2]); return 1; }
+            save_config(&config);
+            printf("Config updated: %s = %s\n", argv[2], argv[3]);
+            return 0;
+        }
+        printf("Usage: chupet config [key value]\n");
         return 1;
     }
 
-    printf("\nChupet Translator v0.1.4 (c) 2026 caffeine-Ink\n");
-    printf("Target  : %s\n", config.targetLanguage);
-    printf("Provider: %s\n", config.provider);
-    printf("Model   : %s\n", config.modelName);
-#ifndef _WIN32
-    printf("Enter text to translate (use \"\"\" for multiline). Press Ctrl+D to exit.\n\n");
-#else
-    printf("Enter text to translate (use \"\"\" for multiline). Press Ctrl+Z or Ctrl+D to exit.\n\n");
-#endif
+    char *origin_override = NULL;
+    char *target_override = NULL;
+    char *text_arg = NULL;
 
-    char *line = NULL;
-    char inputBuffer[16384] = {0};
-    bool isMultiline = false;
-    char prompt_str[256];
-    
-#ifndef _WIN32
-    linenoiseHistorySetMaxLen(100);
-    linenoiseSetMultiLine(1);
-#endif
-
-    while (1) {
-        if (!isMultiline) {
-            snprintf(prompt_str, sizeof(prompt_str), "chupet (%s) > ", config.targetLanguage);
-#ifndef _WIN32
-            line = linenoise(prompt_str);
-#else
-            line = windows_gets(prompt_str);
-#endif
-        } else {
-#ifndef _WIN32
-            line = linenoise("... ");
-#else
-            line = windows_gets("... ");
-#endif
+    // parse options
+    int opt;
+    extern char *optarg;
+    extern int optind;
+    while ((opt = getopt(argc, argv, "o:t:h")) != -1) {
+        switch (opt) {
+            case 'o': origin_override = optarg; break;
+            case 't': target_override = optarg; break;
+            case 'h': print_help(); return 0;
+            default: print_help(); return 1;
         }
-
-        if (line == NULL) break; // Ctrl+C or Ctrl+D or Ctrl+Z
-
-        char *trimmed = line;
-        while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
-
-        if (!isMultiline && strncmp(trimmed, "\"\"\"", 3) == 0) {
-            isMultiline = true;
-            inputBuffer[0] = '\0';
-            size_t t_len = strlen(trimmed);
-            if (t_len >= 6 && strcmp(trimmed + t_len - 3, "\"\"\"") == 0 && strcmp(trimmed, "\"\"\"") != 0) {
-                isMultiline = false;
-                size_t content_len = t_len - 6;
-                if (content_len >= sizeof(inputBuffer)) content_len = sizeof(inputBuffer) - 1;
-                memcpy(inputBuffer, trimmed + 3, content_len);
-                inputBuffer[content_len] = '\0';
-                process_translation(inputBuffer);
-            } else {
-                snprintf(inputBuffer, sizeof(inputBuffer), "%s\n", trimmed + 3);
-            }
-        } else if (isMultiline) {
-            size_t t_len = strlen(trimmed);
-            if (t_len >= 3 && strcmp(trimmed + t_len - 3, "\"\"\"") == 0) {
-                isMultiline = false;
-                size_t current_buf_len = strlen(inputBuffer);
-                size_t line_to_add = strlen(line) - 3;
-                if (current_buf_len + line_to_add < sizeof(inputBuffer)) {
-                    memcpy(inputBuffer + current_buf_len, line, line_to_add);
-                    inputBuffer[current_buf_len + line_to_add] = '\0';
-                }
-                process_translation(inputBuffer);
-                inputBuffer[0] = '\0';
-            } else {
-                size_t current_buf_len = strlen(inputBuffer);
-                size_t line_to_add = strlen(line);
-                if (current_buf_len + line_to_add + 2 < sizeof(inputBuffer)) {
-                    strcat(inputBuffer, line);
-                    strcat(inputBuffer, "\n");
-                }
-            }
-        } else if (strlen(trimmed) > 0) {
-#ifndef _WIN32
-            linenoiseHistoryAdd(line);
-#endif
-            process_translation(trimmed);
-        }
-
-#ifndef _WIN32
-        linenoiseFree(line);
-#else
-        free(line);
-#endif
     }
 
-    printf("\nGoodbye!\n");
+    if (optind < argc) {
+        text_arg = argv[optind];
+    }
+
+    // check config
+    if (strlen(config.provider) == 0 || strlen(config.modelName) == 0 ||
+        (strcmp(config.provider, "gemini") == 0 && strlen(config.geminiApiKey) == 0)) {
+        printf("Error: Configuration required. Run 'chupet -h' for help.\n");
+        return 1;
+    }
+
+    const char *origin = origin_override ? origin_override : config.originLanguage;
+    const char *target = target_override ? target_override : config.targetLanguage;
+
+    if (text_arg) {
+        process_translation(text_arg, origin, target);
+    } else {
+        // read from stdin (pipe support)
+        char buf[65536];
+        size_t n = fread(buf, 1, sizeof(buf) - 1, stdin);
+        if (n > 0) {
+            buf[n] = '\0';
+            process_translation(buf, origin, target);
+        }
+    }
+
     return 0;
 }

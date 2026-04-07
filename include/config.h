@@ -2,9 +2,10 @@
 #define CONFIG_H
 
 typedef struct {
+    char originLanguage[128];
     char targetLanguage[128];
     char provider[32];
-    char modelName[128]; 
+    char modelName[128];
     char geminiApiKey[256];
 } AppConfig;
 

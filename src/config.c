@@ -24,7 +24,8 @@ static void get_config_path(char *path, size_t size) {
 }
 
 void load_config(AppConfig *config) {
-    // default config
+    // init default config
+    snprintf(config->originLanguage, sizeof(config->originLanguage), "auto");
     snprintf(config->targetLanguage, sizeof(config->targetLanguage), "English");
     config->provider[0] = '\0';
     config->modelName[0] = '\0';
@@ -65,7 +66,10 @@ void load_config(AppConfig *config) {
     }
 
     for (int i = 1; i < r; i++) {
-        if (jsoneq(json, &t[i], "targetLanguage") == 0) {
+        if (jsoneq(json, &t[i], "originLanguage") == 0) {
+            snprintf(config->originLanguage, sizeof(config->originLanguage), "%.*s", t[i+1].end - t[i+1].start, json + t[i+1].start);
+            i++;
+        } else if (jsoneq(json, &t[i], "targetLanguage") == 0) {
             snprintf(config->targetLanguage, sizeof(config->targetLanguage), "%.*s", t[i+1].end - t[i+1].start, json + t[i+1].start);
             i++;
         } else if (jsoneq(json, &t[i], "provider") == 0) {
@@ -89,6 +93,7 @@ void save_config(const AppConfig *config) {
     if (!f) return;
 
     fprintf(f, "{\n");
+    fprintf(f, "  \"originLanguage\": \"%s\",\n", config->originLanguage);
     fprintf(f, "  \"targetLanguage\": \"%s\",\n", config->targetLanguage);
     fprintf(f, "  \"provider\": \"%s\",\n", config->provider);
     fprintf(f, "  \"modelName\": \"%s\",\n", config->modelName);
