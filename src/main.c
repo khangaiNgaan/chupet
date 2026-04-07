@@ -77,6 +77,7 @@ void process_translation(const char *text, const char *origin, const char *targe
             jsmn_init(&p);
             int r = jsmn_parse(&p, response.data, strlen(response.data), t, sizeof(t) / sizeof(t[0]));
             if (r > 0) {
+                bool found = false;
                 for (int i = 1; i < r; i++) {
                     if (t[i].type == JSMN_STRING) {
                         int len = t[i].end - t[i].start;
@@ -96,12 +97,18 @@ void process_translation(const char *text, const char *origin, const char *targe
                                     } else putchar(val_str[k]);
                                 }
                                 putchar('\n');
+                                found = true;
                                 break;
                             }
                         }
                     }
                 }
+                if (!found) fprintf(stderr, "Error: result key not found in response.\n%s\n", response.data);
+            } else {
+                fprintf(stderr, "Error: Failed to parse JSON response (code %d).\n%s\n", r, response.data);
             }
+        } else {
+            fprintf(stderr, "Error: HTTP request failed or returned empty data.\n");
         }
         free(post_data);
     }
@@ -113,7 +120,8 @@ void process_translation(const char *text, const char *origin, const char *targe
 
 void print_help() {
     printf("USAGE: chupet [options] [text]\n\n");
-    printf("chupet v0.2.1 (c) 2026 caffeine-Ink\n\n");
+    printf("chupet v0.2.2 (c) 2026 caffeine-Ink\n\n");
+
     printf("OPTIONS:\n");
     printf("  -o, --origin <lang>    original language (config: %s)\n", config.originLanguage);
     printf("  -t, --target <lang>    target language   (config: %s)\n", config.targetLanguage);
