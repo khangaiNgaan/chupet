@@ -41,14 +41,7 @@ char *escape_json(const char *input) {
     return escaped;
 }
 
-void process_translation(const char *text, const char *origin, const char *target) {
-    if (!text || strlen(text) == 0) return;
-    
-    char prompt[16384];
-    snprintf(prompt, sizeof(prompt), 
-             "You are a professional translator. Translate the following text from %s to %s. Only output the translation result, no explanation. No surplus line break in the end of output. Don't translate the `Text:`.\n\nText: %s", 
-             origin, target, text);
-             
+void process_llm_request(const char *prompt) {
     char *escaped_prompt = escape_json(prompt);
     char *post_data = NULL;
     char url[1024];
@@ -118,18 +111,51 @@ void process_translation(const char *text, const char *origin, const char *targe
     curl_slist_free_all(headers);
 }
 
+// handle text translation requests
+void process_translation(const char *text, const char *origin, const char *target) {
+    if (!text || strlen(text) == 0) return;
+    
+    char prompt[16384];
+    snprintf(prompt, sizeof(prompt), 
+             "You are a professional translator. Translate the following text from %s to %s. Only output the translation result, no explanation. No surplus line break in the end of output. Don't translate the `Text:`.\n\nText: %s", 
+             origin, target, text);
+    process_llm_request(prompt);
+}
+
+void process_grammar_check(const char *text) {
+    if (!text || strlen(text) == 0) return;
+
+    char prompt[16384];
+    snprintf(prompt, sizeof(prompt),
+             "You are a strict professional language expert. Check the grammar, spelling, and phrasing of the following text. "
+             "If the text is absolutely grammatically correct, sounds completely natural to a native speaker, and has no typos, output exactly 'OK' and nothing else. "
+             "If it has ANY errors, unnatural phrasing, or can be improved, provide up to 3 corrected and polished versions (1 is fine for simple phrases). "
+             "Only output the result, no explanation. No surplus line break in the end of output. "
+             "Don't translate the `Text:`.\n\nText: %s",
+             text);
+    process_llm_request(prompt);
+}
+
+void print_version() {
+    printf("chupet v0.3.0\n");
+    printf("Copyright (c) 2026 caffeine-Ink\n");
+    printf("Licensed under BSD 2-Clause License.\n");
+}
+
 void print_help() {
     printf("USAGE: chupet [options] [text]\n\n");
-    printf("chupet v0.2.2 (c) 2026 caffeine-Ink\n\n");
 
     printf("OPTIONS:\n");
     printf("  -o, --origin <lang>    original language (config: %s)\n", config.originLanguage);
     printf("  -t, --target <lang>    target language   (config: %s)\n", config.targetLanguage);
+    printf("  -c, --check            check grammar and polish text\n");
+    printf("  -v, --version          show version information\n");
     printf("  -h, --help             show this help\n");
     printf("COMMANDS:\n");
     printf("  config <key> <value>   update configuration\n");
     printf("EXAMPLES:\n");
     printf("  chupet -o English -t Japanese \"The quick brown fox jumps over the lazy dog.\"\n");
+    printf("  chupet -c \"I is a student.\"\n");
     printf("  chupet < file.txt\n");
     printf("  cat file.txt | chupet -t Chinese > output.txt\n");
 }
@@ -183,21 +209,26 @@ int main(int argc, char *argv[]) {
     char *origin_override = NULL;
     char *target_override = NULL;
     char *text_arg = NULL;
+    bool check_mode = false;
 
     // parse options
     int opt;
     static struct option long_options[] = {
         {"origin", required_argument, 0, 'o'},
         {"target", required_argument, 0, 't'},
+        {"check",  no_argument,       0, 'c'},
+        {"version",no_argument,       0, 'v'},
         {"help",   no_argument,       0, 'h'},
         {0, 0, 0, 0}
     };
 
     int option_index = 0;
-    while ((opt = getopt_long(argc, argv, "o:t:h", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "o:t:cvh", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'o': origin_override = optarg; break;
             case 't': target_override = optarg; break;
+            case 'c': check_mode = true; break;
+            case 'v': print_version(); return 0;
             case 'h': print_help(); return 0;
             default: return 1;
         }
@@ -218,14 +249,22 @@ int main(int argc, char *argv[]) {
     const char *target = target_override ? target_override : config.targetLanguage;
 
     if (text_arg) {
-        process_translation(text_arg, origin, target);
+        if (check_mode) {
+            process_grammar_check(text_arg);
+        } else {
+            process_translation(text_arg, origin, target);
+        }
     } else {
         // read from stdin (pipe support)
         char buf[65536];
         size_t n = fread(buf, 1, sizeof(buf) - 1, stdin);
         if (n > 0) {
             buf[n] = '\0';
-            process_translation(buf, origin, target);
+            if (check_mode) {
+                process_grammar_check(buf);
+            } else {
+                process_translation(buf, origin, target);
+            }
         }
     }
 

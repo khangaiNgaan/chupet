@@ -50,4 +50,4 @@ cat file.txt | chupet > output.txt
 
 <br>
 
-Licensed under MIT.
+Licensed under BSD 2-Clause License.
