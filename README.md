@@ -31,6 +31,8 @@ chupet config key YOUR-API-KEY
 
 `-h` or `--help` to print help
 
+`-c` or `--check` for grammar checker mode
+
 You can configure the default original and target languages:
 
 ```bash
