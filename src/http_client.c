@@ -4,12 +4,6 @@
 #include <unistd.h>
 #include "http_client.h"
 
-// Platform-aware popen/pclose
-#ifdef _WIN32
-#define popen _popen
-#define pclose _pclose
-#endif
-
 void http_response_init(HttpResponse *response) {
     response->data = NULL;
     response->size = 0;
@@ -26,7 +20,6 @@ void http_response_free(HttpResponse *response) {
 int http_post(const char *url, struct curl_slist *headers, const char *post_data, HttpResponse *response) {
     // create temporary file for payload
     char tmp_file[256];
-#ifndef _WIN32
     snprintf(tmp_file, sizeof(tmp_file), "/tmp/chupet_post_XXXXXX");
     int fd = mkstemp(tmp_file);
     if (fd != -1) {
@@ -34,9 +27,6 @@ int http_post(const char *url, struct curl_slist *headers, const char *post_data
     } else {
         snprintf(tmp_file, sizeof(tmp_file), "chupet_payload.tmp");
     }
-#else
-    snprintf(tmp_file, sizeof(tmp_file), "chupet_payload.tmp");
-#endif
 
     FILE *f = fopen(tmp_file, "w");
     if (!f) return -1;

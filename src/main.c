@@ -6,13 +6,6 @@
 #include <getopt.h>
 #include <locale.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
-#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
-#endif
-#endif
-
 #include "config.h"
 #include "http_client.h"
 #include "jsmn.h"
@@ -155,17 +148,13 @@ void print_help() {
     printf("  config <key> <value>   update configuration\n");
     printf("EXAMPLES:\n");
     printf("  chupet -o English -t Japanese \"The quick brown fox jumps over the lazy dog.\"\n");
-    printf("  chupet -c \"I is a student.\"\n");
+    printf("  chupet -c \"Why you so lonely\"\n");
     printf("  chupet < file.txt\n");
     printf("  cat file.txt | chupet -t Chinese > output.txt\n");
 }
 
 int main(int argc, char *argv[]) {
     setlocale(LC_ALL, "");
-#ifdef _WIN32
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
-#endif
 
     load_config(&config);
 
